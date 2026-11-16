@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<script>try{var t=localStorage.getItem("vh-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 <style>
 :root{
   --bg:#EEF3F6; --surface:#FFFFFF; --ink:#13233A; --muted:#5E6E80; --line:#D3DDE5;
@@ -138,6 +139,9 @@ dialog::backdrop{background:rgba(10,20,35,.45)}
 .toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translate(-50%,140%);background:var(--ink);color:var(--surface);padding:12px 18px;border-radius:14px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:20;max-width:calc(100% - 32px)}
 .toast.show{transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.topbar{display:flex;justify-content:flex-end}
+.themebtn{font:inherit;font-size:14px;font-weight:700;padding:8px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.themebtn:focus-visible{outline:3px solid var(--long);outline-offset:2px}
 .mnav{display:flex;align-items:center;justify-content:space-between;margin:24px 0 10px}
 .mnav h2{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:24px;margin:0}
 .mnav button{font:inherit;font-size:22px;width:48px;height:48px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:grid;place-items:center}
@@ -154,6 +158,7 @@ dialog::backdrop{background:rgba(10,20,35,.45)}
 </head>
 <body>
 <main>
+  <div class="topbar"><button type="button" class="themebtn" id="themeBtn"></button></div>
   <h1>Vienna Half Marathon</h1>
   <p class="sub">26 Oct → 18 Apr 2027. Tap a day to add, change or remove a run.</p>
 
@@ -212,7 +217,7 @@ dialog::backdrop{background:rgba(10,20,35,.45)}
     </fieldset>
     <div id="kmBlock">
       <label for="kmIn">Distance (km)</label>
-      <div class="kmrow"><input id="kmIn" type="number" inputmode="decimal" step="0.1" min="0" max="60"><span>km</span></div>
+      <div class="kmrow"><input id="kmIn" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done"><span>km</span></div>
       <p class="err" id="dlgErr" role="alert"></p>
     </div>
     <label class="donechk"><input type="checkbox" id="doneIn"> <span>Done</span></label>
@@ -473,6 +478,15 @@ dialog::backdrop{background:rgba(10,20,35,.45)}
   document.getElementById("bCancel").addEventListener("click",closeDlg);
   kmIn.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); bSave.click(); } });
   dlg.addEventListener("click",e=>{ if(e.target===dlg) closeDlg(); });
+
+  // ---------- theme ----------
+  const themeBtn=document.getElementById("themeBtn"), root=document.documentElement;
+  const mq=window.matchMedia?window.matchMedia("(prefers-color-scheme: dark)"):null;
+  const isDark=()=>{ const t=root.getAttribute("data-theme"); return t?t==="dark":!!(mq&&mq.matches); };
+  const syncBtn=()=>{ themeBtn.textContent=isDark()?"Light mode":"Dark mode"; themeBtn.setAttribute("aria-label","Switch to "+(isDark()?"light":"dark")+" mode"); };
+  themeBtn.addEventListener("click",()=>{ const next=isDark()?"light":"dark"; root.setAttribute("data-theme",next); try{localStorage.setItem("vh-theme",next);}catch(e){} syncBtn(); });
+  if(mq&&mq.addEventListener) mq.addEventListener("change",syncBtn);
+  syncBtn();
 
   render();
 })();
