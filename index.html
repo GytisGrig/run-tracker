@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vienna Half – Run Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF3F6; --surface:#FFFFFF; --ink:#13233A; --muted:#5E6E80; --line:#D3DDE5;
+  --easy:#7FB08E; --easy-t:#E3F0E6; --long:#3C6E9F; --long-t:#DCE7F2;
+  --int:#E9792F; --int-t:#FBE5D6; --race:#D9A514; --race-t:#FAEFC9;
+  --gear:#8A6FB3; --gear-t:#ECE5F5; --brk:#B5BFC9;
+  --today:#13233A; --done-ink:#FFFFFF;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1A27; --surface:#172435; --ink:#E6EDF3; --muted:#93A3B5; --line:#2A3A4E;
+    --easy-t:#1F3428; --long-t:#1B2C40; --int-t:#3A2617; --race-t:#3A3115; --gear-t:#2A2238;
+    --today:#E6EDF3; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1A27; --surface:#172435; --ink:#E6EDF3; --muted:#93A3B5; --line:#2A3A4E;
+  --easy-t:#1F3428; --long-t:#1B2C40; --int-t:#3A2617; --race-t:#3A3115; --gear-t:#2A2238;
+  --today:#E6EDF3; color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Atkinson Hyperlegible",system-ui,-apple-system,Segoe UI,sans-serif;font-size:16px;line-height:1.45}
+main{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+h1{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:clamp(28px,6vw,44px);line-height:1.02;letter-spacing:-.02em;margin:8px 0 4px}
+.sub{color:var(--muted);margin:0 0 22px}
+
+/* course line hero */
+.course{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px}
+.track{position:relative;height:56px;margin:6px 10px 30px}
+.tick{position:absolute;width:2px;height:14px;margin:-7px 0 0 -1px;background:var(--muted);border-radius:1px;pointer-events:none}
+.flag{position:absolute;right:-12px;top:50%;transform:translateY(-100%);font-size:22px;line-height:1;pointer-events:none}
+.tick.gear{background:var(--gear)}
+.mlabel.gear{color:var(--gear)}
+.mlabel{position:absolute;transform:translateX(-50%);font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;pointer-events:none}
+.track svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.runner{position:absolute;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:var(--int);border:3px solid var(--surface);box-shadow:0 0 0 2px var(--int);left:0;transition:left 1.1s cubic-bezier(.2,.8,.2,1)}
+.ends{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;margin-top:6px;text-align:center}
+.stats{display:flex;justify-content:center;gap:clamp(28px,10vw,64px);margin-top:16px;text-align:center}
+.stat b{display:block;font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:clamp(22px,5vw,30px);line-height:1.1}
+.stat span{color:var(--muted);font-size:13px}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:20px 0 6px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.hint{font-size:13px;color:var(--muted);margin:0 0 8px}
+.sync{font-size:12px;color:var(--muted)}
+
+.month{margin-top:26px}
+.month h2{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:22px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dow{font-size:12px;color:var(--muted);text-align:center;padding-bottom:2px}
+.day{min-height:64px;border-radius:9px;background:transparent;border:1px solid transparent;padding:5px 5px 6px;font:inherit;color:inherit;text-align:left;display:flex;flex-direction:column;gap:2px;position:relative}
+.day .n{font-size:12px;color:var(--muted)}
+.day .t{font-size:12px;font-weight:700;line-height:1.15}
+.day .k{font-size:11px;color:var(--muted)}
+.day.out{visibility:hidden}
+.day.rest{border-color:var(--line);opacity:.55}
+.day.brk{background:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--brk) 25%,transparent) 6px 7px);border-color:var(--line)}
+.day.task{cursor:pointer;border-color:transparent}
+.day.task:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.day.easy{background:var(--easy-t)} .day.easy .t{color:color-mix(in srgb,var(--easy) 70%,var(--ink))}
+.day.long{background:var(--long-t)} .day.long .t{color:var(--long)}
+.day.int{background:var(--int-t)}  .day.int .t{color:var(--int)}
+.day.race{background:var(--race-t)} .day.race .t{color:color-mix(in srgb,var(--race) 75%,var(--ink))}
+.day.gear{background:var(--gear-t)} .day.gear .t{color:var(--gear)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .day.long .t{color:#8DB4DB}}
+:root[data-theme="dark"] .day.long .t{color:#8DB4DB}
+.day.done.easy{background:var(--easy)} .day.done.long{background:var(--long)} .day.done.int{background:var(--int)}
+.day.done.race{background:var(--race)} .day.done.gear{background:var(--gear)}
+.day.done .t,.day.done .n,.day.done .k{color:var(--done-ink)!important}
+.day.done::after{content:"";position:absolute;right:6px;top:6px;width:14px;height:14px;border-radius:50%;background:var(--done-ink);
+  -webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="black" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/14px no-repeat;
+          mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="black" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/14px no-repeat}
+.day.missed{opacity:.6}
+.day.today{box-shadow:inset 0 0 0 2px var(--today)}
+.day.pop{animation:pop .28s ease-out}
+@keyframes pop{0%{transform:scale(.92)}60%{transform:scale(1.05)}100%{transform:scale(1)}}
+
+.types{display:flex;gap:6px;margin:0 0 16px;border:0;padding:0}
+.types legend{font-weight:700;margin-bottom:6px;padding:0}
+.types label{flex:1 1 30%;margin:0}
+.donechk{display:flex;align-items:center;gap:10px;margin-top:14px;font-weight:700;font-size:18px;cursor:pointer}
+.donechk input{width:24px;height:24px;accent-color:var(--easy)}
+.types input{position:absolute;opacity:0;pointer-events:none}
+.types span{display:block;text-align:center;padding:10px 6px;border-radius:10px;border:1.5px solid var(--line);font-weight:700;cursor:pointer}
+.types input:focus-visible + span{outline:3px solid var(--long);outline-offset:2px}
+.types input[value=easy]:checked + span{background:var(--easy);border-color:var(--easy);color:#fff}
+.types input[value=long]:checked + span{background:var(--long);border-color:var(--long);color:#fff}
+.types input[value=int]:checked + span{background:var(--int);border-color:var(--int);color:#fff}
+.types input[value=race]:checked + span{background:var(--race);border-color:var(--race);color:#fff}
+.day.free{cursor:pointer}
+.day.free:hover{border-color:var(--muted)}
+.day.free:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+dialog{border:none;border-radius:18px;padding:0;background:var(--surface);color:var(--ink);width:min(420px,calc(100% - 24px));box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(10,20,35,.45)}
+.sheet{padding:20px 20px calc(18px + env(safe-area-inset-bottom,0px))}
+.sheet h3{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:22px;margin:0 0 2px}
+.sheet .plan{color:var(--muted);margin:0 0 16px}
+.sheet label{display:block;font-weight:700;margin-bottom:6px}
+.kmrow{display:flex;align-items:center;gap:8px}
+.kmrow input{font:inherit;font-size:22px;width:120px;padding:8px 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.kmrow input:focus{outline:3px solid var(--long);outline-offset:1px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.btns button{font:inherit;font-weight:700;padding:10px 16px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.btns .primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.btns .danger{color:#C0392B;border-color:color-mix(in srgb,#C0392B 40%,var(--line))}
+.btns button:focus-visible{outline:3px solid var(--long);outline-offset:2px}
+.err{color:#C0392B;font-size:14px;min-height:1.2em;margin:6px 0 0}
+
+.ach{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:4px 16px}
+.ach summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;padding:12px 0;font-weight:700}
+.ach summary::-webkit-details-marker{display:none}
+.ach summary .cnt{font-family:"Bricolage Grotesque",sans-serif;font-size:20px}
+.ach summary .recent{margin-left:auto;font-size:20px;letter-spacing:2px}
+.ach summary .chev{color:var(--muted);transition:transform .2s}
+.ach[open] summary .chev{transform:rotate(90deg)}
+.achgroup{font-size:13px;color:var(--muted);margin:10px 0 6px}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding-bottom:12px}
+.badge{display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;border:1px solid var(--line)}
+.badge .ic{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:20px;background:var(--race-t)}
+.badge b{display:block;font-size:14px;line-height:1.2}
+.badge small{display:block;font-size:12px;color:var(--muted);line-height:1.25}
+.badge.locked .ic{filter:grayscale(1);opacity:.4;background:var(--bg)}
+.badge.locked b{color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translate(-50%,140%);background:var(--ink);color:var(--surface);padding:12px 18px;border-radius:14px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:20;max-width:calc(100% - 32px)}
+.toast.show{transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.mnav{display:flex;align-items:center;justify-content:space-between;margin:24px 0 10px}
+.mnav h2{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:24px;margin:0}
+.mnav button{font:inherit;font-size:22px;width:48px;height:48px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:grid;place-items:center}
+.mnav button:disabled{opacity:.3;cursor:default}
+.mnav button:focus-visible{outline:3px solid var(--long);outline-offset:2px}
+.month{margin-top:0;touch-action:pan-y}
+.mdots{display:flex;justify-content:center;gap:6px;margin-top:12px}
+.mdots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.mdots i.on{background:var(--ink)}
+@media (min-width:640px){.day{min-height:76px;padding:7px}.day .t{font-size:13px}}
+@media (prefers-reduced-motion:reduce){.runner{transition:none}.day.pop{animation:none}}
+</style>
+
+</head>
+<body>
+<main>
+  <h1>Vienna Half Marathon</h1>
+  <p class="sub">26 Oct → 18 Apr 2027. Tap a day to add, change or remove a run.</p>
+
+  <section class="course" aria-label="Progress">
+    <div class="track" id="track">
+      <svg viewBox="0 0 1000 56" preserveAspectRatio="none" aria-hidden="true">
+        <path id="pathBg" d="M0 28 C 120 4, 220 52, 340 28 S 560 4, 680 28 S 880 52, 1000 28" fill="none" stroke="var(--line)" stroke-width="6" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        <path id="pathFg" d="M0 28 C 120 4, 220 52, 340 28 S 560 4, 680 28 S 880 52, 1000 28" fill="none" stroke="var(--int)" stroke-width="6" stroke-linecap="round" vector-effect="non-scaling-stroke" pathLength="100" stroke-dasharray="0 100"/>
+      </svg>
+      <div id="marks" aria-hidden="true"></div>
+      <span class="flag" aria-hidden="true">🏆</span>
+      <div class="runner" id="runner" aria-hidden="true"></div>
+    </div>
+    <div class="ends"><span>Start</span><span>Finish</span></div>
+    <div class="stats">
+      <div class="stat"><b id="sRuns">0/0</b><span>runs done</span></div>
+      <div class="stat"><b id="sKm">0</b><span>km run</span></div>
+    </div>
+  </section>
+
+  <details class="ach" id="ach">
+    <summary><span class="chev">▶</span><span class="cnt" id="achCnt">0/0</span><span>achievements</span><span class="recent" id="achRecent" aria-hidden="true"></span></summary>
+    <div id="achBody"></div>
+  </details>
+
+  <div class="legend">
+    <span><i style="background:var(--easy)"></i>Easy</span>
+    <span><i style="background:var(--long)"></i>Long</span>
+    <span><i style="background:var(--int)"></i>Intervals</span>
+    <span><i style="background:var(--race)"></i>Race</span>
+    <span><i style="background:var(--gear)"></i>Shoes</span>
+  </div>
+  <p class="hint">Easy and long runs at conversation pace. Intervals: 1 km easy, then 500 m fast + 500 m easy repeats, then 1 km easy.</p>
+
+  <div class="mnav">
+    <button type="button" id="mPrev" aria-label="Previous month">‹</button>
+    <h2 id="mName" aria-live="polite"></h2>
+    <button type="button" id="mNext" aria-label="Next month">›</button>
+  </div>
+  <div id="cal"></div>
+  <div class="mdots" id="mDots" aria-hidden="true"></div>
+
+</main>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <form class="sheet" method="dialog">
+    <h3 id="dlgTitle"></h3>
+    <fieldset class="types">
+      <legend>Run</legend>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;width:100%">
+        <label><input type="radio" name="rt" value="easy"><span>Easy</span></label>
+        <label><input type="radio" name="rt" value="long"><span>Long</span></label>
+        <label><input type="radio" name="rt" value="int"><span>Intervals</span></label>
+        <label><input type="radio" name="rt" value="race"><span>Race</span></label>
+      </div>
+    </fieldset>
+    <div id="kmBlock">
+      <label for="kmIn">Distance (km)</label>
+      <div class="kmrow"><input id="kmIn" type="number" inputmode="decimal" step="0.1" min="0" max="60"><span>km</span></div>
+      <p class="err" id="dlgErr" role="alert"></p>
+    </div>
+    <label class="donechk"><input type="checkbox" id="doneIn"> <span>Done</span></label>
+    <div class="btns">
+      <button type="button" class="primary" id="bSave">Save</button>
+      <button type="button" class="danger" id="bRemove">Remove run</button>
+      <button type="button" id="bCancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  // ---------- helpers ----------
+  const iso = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  const add = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+  const D = (y,m,d) => new Date(y,m-1,d);
+  const fmtKm = v => (Math.round(v*10)/10).toLocaleString("en-GB");
+  const TYPES={easy:"Easy",long:"Long",int:"Intervals",race:"Race",gear:"Shoes"};
+  const START="2026-10-26", END="2027-04-18";
+
+  // ---------- suggested plan ----------
+  const P={};
+  const put=(d,o)=>{ P[iso(d)]=o; };
+  const easy=()=>({type:"easy",km:5});
+  const long=(k,gel)=>({type:"long",km:k,gel:!!gel});
+  const race=k=>({type:"race",km:k});
+  const intv=n=>({type:"int",km:2+n,reps:n});
+  [7,8,8,6,9,9,"R",7,10].forEach((k,w)=>{ const mon=add(D(2026,10,26),7*w);
+    put(add(mon,2),easy()); put(add(mon,6), k==="R"?race(10):long(k)); });
+  const BREAK=new Set(); for(let d=D(2026,12,28); d<=D(2027,1,14); d=add(d,1)) BREAK.add(iso(d));
+  put(D(2027,1,15),easy());
+  [["E","R"],[5,9],[5,10],["E",8],[5,"11g"],[5,"12g"],["E","R"],[6,"13g"],[6,"14g"],[6,"16x"],[4,"12g"],["E",8],["E","H"]].forEach(([thu,lk],w)=>{
+    const mon=add(D(2027,1,18),7*w);
+    put(add(mon,1),easy()); put(add(mon,3), thu==="E"?easy():intv(thu));
+    let s; if(lk==="R") s=race(10); else if(lk==="H") s=race(21.1);
+    else { const k=parseInt(lk,10); s=long(k,/g/.test(lk)); if(/x/.test(lk)) s.gear=true; }
+    put(add(mon,6),s);
+  });
+  P["2027-01-24"].note="+ gel test";
+  put(D(2027,2,27),{type:"gear",km:0});
+
+  // ---------- state ----------
+  // days: overrides per date. {type,km,done} or {type:"none"} for a removed run.
+  const KEY="vh-tracker";
+  let days={}, seen=null;
+  try{ const r=JSON.parse(localStorage.getItem(KEY)||"null"); if(r){ days=r.days||{}; seen=Array.isArray(r.seen)?r.seen:null; } }catch(e){}
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify({days,seen:seen||[]})); }catch(e){} }
+
+  function eff(k){
+    const o=days[k];
+    if(o) return o.type==="none"?null:o;
+    return P[k]?{type:P[k].type,km:P[k].km,done:false}:null;
+  }
+  const isRun=e=>e&&e.type!=="gear";
+  function label(k,e){
+    const s=P[k], same=s&&s.type===e.type&&s.km===e.km;
+    if(e.type==="gear") return ["Shoes","buy new"];
+    if(e.type==="race") return [e.km>20?"HALF":"Race "+fmtKm(e.km), fmtKm(e.km)+" km"];
+    if(e.type==="int") return [same&&s.reps?s.reps+"×500":"Intervals", fmtKm(e.km)+" km"];
+    if(e.type==="long"){ let sub=fmtKm(e.km)+" km"; if(same&&!e.done&&s.gear) sub="race gear"; else if(same&&!e.done&&s.gel) sub="+ gel"; return ["Long "+fmtKm(e.km),sub]; }
+    return ["Easy",fmtKm(e.km)+" km"];
+  }
+
+  // ---------- render ----------
+  const today=iso(new Date());
+  const months=[[2026,10],[2026,11],[2026,12],[2027,1],[2027,2],[2027,3],[2027,4]];
+  const names=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const cal=document.getElementById("cal");
+  const allKeys=(()=>{ const ks=[]; for(let d=D(2026,10,26); iso(d)<=END; d=add(d,1)) ks.push(iso(d)); return ks; })();
+  const mondayOf=k=>{ const [y,m,d]=k.split("-").map(Number); const dt=new Date(y,m-1,d); return add(dt,-((dt.getDay()+6)%7)); };
+
+  let mi=(()=>{ const t=today.slice(0,7); const i=months.findIndex(([y,m])=>y+"-"+String(m).padStart(2,"0")===t); return i>=0?i:(today<START?0:months.length-1); })();
+  function render(focusKey){
+    cal.textContent="";
+    if(focusKey){ const fi=months.findIndex(([y,m])=>focusKey.startsWith(y+"-"+String(m).padStart(2,"0"))); if(fi>=0) mi=fi; }
+    document.getElementById("mName").textContent=names[months[mi][1]-1]+" "+months[mi][0];
+    document.getElementById("mPrev").disabled=mi===0; document.getElementById("mNext").disabled=mi===months.length-1;
+    const dots=document.getElementById("mDots"); dots.textContent=""; months.forEach((_,i)=>{ const x=document.createElement("i"); if(i===mi) x.className="on"; dots.appendChild(x); });
+    for(const [y,m] of [months[mi]]){
+      const sec=document.createElement("section"); sec.className="month";
+      const g=document.createElement("div"); g.className="grid";
+      ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].forEach(n=>{const e=document.createElement("div");e.className="dow";e.textContent=n;g.appendChild(e);});
+      const lead=(new Date(y,m-1,1).getDay()+6)%7;
+      for(let i=0;i<lead;i++){const e=document.createElement("div");e.className="day out";g.appendChild(e);}
+      const nd=new Date(y,m,0).getDate();
+      for(let d=1; d<=nd; d++){
+        const k=iso(new Date(y,m-1,d)), e=eff(k), inRange=k>=START&&k<=END;
+        const el=document.createElement(inRange?"button":"div");
+        el.className="day"; el.dataset.k=k;
+        const n=document.createElement("span"); n.className="n"; n.textContent=d; el.appendChild(n);
+        if(e){
+          const [t1,t2]=label(k,e);
+          el.classList.add("task",e.type);
+          const t=document.createElement("span"); t.className="t"; t.textContent=t1; el.appendChild(t);
+          const kk=document.createElement("span"); kk.className="k"; kk.textContent=t2; el.appendChild(kk);
+          if(e.done) el.classList.add("done"); else if(k<today&&isRun(e)) el.classList.add("missed");
+        } else if(BREAK.has(k)){ el.classList.add("brk","free"); const kk=document.createElement("span"); kk.className="k"; kk.textContent="Break"; el.appendChild(kk); }
+        else if(inRange) el.classList.add("rest","free");
+        if(inRange){
+          el.type="button";
+          el.setAttribute("aria-label",new Date(y,m-1,d).toDateString()+": "+(e?TYPES[e.type]+(isRun(e)?" "+fmtKm(e.km)+" km":"")+(e.done?", done":""):"no run, tap to add"));
+          el.addEventListener("click",()=>openDlg(k));
+        }
+        if(k===today) el.classList.add("today");
+        g.appendChild(el);
+      }
+      sec.appendChild(g); cal.appendChild(sec);
+    }
+    stats(); renderAch();
+    if(focusKey){ const b=cal.querySelector('[data-k="'+focusKey+'"]'); if(b){ b.classList.add("pop"); b.focus({preventScroll:true}); } }
+  }
+
+  function weekRuns(mon){ return [0,1,2,3,4,5,6].map(i=>eff(iso(add(mon,i)))).filter(isRun); }
+  function stats(){
+    let planned=0,doneN=0,km=0,tot=0;
+    for(const k of allKeys){ const e=eff(k); if(!isRun(e)) continue; planned++; tot+=e.km; if(e.done){doneN++; km+=e.km;} }
+    document.getElementById("sRuns").textContent=doneN+"/"+planned;
+    document.getElementById("sKm").textContent=fmtKm(km)+" / "+Math.round(tot);
+    const pct=tot?Math.min(100,km/tot*100):0;
+    document.getElementById("pathFg").setAttribute("stroke-dasharray",pct+" 100");
+    placeRunner(pct);
+    placeMarks(tot);
+  }
+  const MARKS=[["2027-02-27","Shoes",1,"gear"]];
+  function placeMarks(tot){
+    const box=document.getElementById("marks"), path=document.getElementById("pathBg"), track=document.getElementById("track");
+    box.textContent=""; if(!tot) return;
+    const L=path.getTotalLength(), W=track.clientWidth, H=track.clientHeight;
+    const put=(pct,txt,row,cls)=>{ const pt=path.getPointAtLength(L*Math.min(100,pct)/100);
+      const x=pt.x/1000*W, y=pt.y/56*H;
+      const t=document.createElement("span"); t.className="tick"+(cls?" "+cls:""); t.style.left=x+"px"; t.style.top=y+"px"; box.appendChild(t);
+      const l=document.createElement("span"); l.className="mlabel"+(cls?" "+cls:""); l.textContent=txt; l.style.left=x+"px"; l.style.top=(y+9+row*13)+"px"; box.appendChild(l); };
+    for(const [k,txt,row,cls] of MARKS){ let c=0; for(const kk of allKeys){ if(kk>k) break; const e=eff(kk); if(isRun(e)) c+=e.km; } put(c/tot*100,txt,row,cls); }
+    put(50,"Halfway",0);
+  }
+  function placeRunner(pct){
+    const path=document.getElementById("pathBg"), track=document.getElementById("track"), r=document.getElementById("runner");
+    const pt=path.getPointAtLength(path.getTotalLength()*pct/100);
+    r.style.left=(pt.x/1000*track.clientWidth)+"px"; r.style.top=(pt.y/56*track.clientHeight)+"px";
+  }
+  window.addEventListener("resize",stats);
+  const go=dir=>{ const n=mi+dir; if(n<0||n>=months.length) return; mi=n; render(); };
+  document.getElementById("mPrev").addEventListener("click",()=>go(-1));
+  document.getElementById("mNext").addEventListener("click",()=>go(1));
+  let tx=null,ty=null;
+  cal.addEventListener("touchstart",e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; },{passive:true});
+  cal.addEventListener("touchend",e=>{ if(tx===null) return; const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty; tx=null;
+    if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5) go(dx<0?1:-1); },{passive:true});
+
+  // ---------- achievements ----------
+  const ACH=[
+    ["Consistency","first","👟","First step","First run done",c=>c.n>=1],
+    ["Consistency","week","✅","Full week","Every planned run in a week done",c=>c.maxStreak>=1],
+    ["Consistency","s3","🔥","Three in a row","3 full weeks in a row",c=>c.maxStreak>=3],
+    ["Consistency","s6","💪","Habit formed","6 full weeks in a row",c=>c.maxStreak>=6],
+    ["Consistency","s10","🛡️","Unbreakable","10 full weeks in a row",c=>c.maxStreak>=10],
+    ["Consistency","back","🔄","Back on track","First run after the January break",c=>c.afterBreak],
+    ["Consistency","month","🌕","Perfect month","Every planned run in a month done",c=>c.perfectMonth],
+    ["Consistency","p1","🎄","Phase 1 complete","All runs up to Christmas done",c=>c.phase1],
+    ["Distance","k50","⭐","50 km","50 km in total",c=>c.km>=50],
+    ["Distance","k100","💯","100 km","100 km in total",c=>c.km>=100],
+    ["Distance","k250","🚀","250 km","250 km in total",c=>c.km>=250],
+    ["Distance","k400","🏔️","400 km","400 km in total",c=>c.km>=400],
+    ["Training","int1","⚡","First intervals","First interval session done",c=>c.ints>=1],
+    ["Training","int5","🏎️","Speed work","5 interval sessions done",c=>c.ints>=5],
+    ["Training","d10","🔟","Into double digits","First run of 10 km or more",c=>c.maxKm>=10],
+    ["Training","d16","🗺️","Longest run","16 km done",c=>c.maxKm>=16],
+    ["Run count","r10","🏃","10 runs","10 runs done",c=>c.n>=10],
+    ["Run count","r20","🏃","20 runs","20 runs done",c=>c.n>=20],
+    ["Run count","r30","🏃","30 runs","30 runs done",c=>c.n>=30],
+    ["Run count","r40","🏃","40 runs","40 runs done",c=>c.n>=40],
+    ["Run count","r50","🏃","50 runs","50 runs done",c=>c.n>=50],
+    ["Races","rc1","❄️","Winter warrior","10k on 13 Dec",c=>c.doneOn("2026-12-13")],
+    ["Races","rc2","🎆","New year starter","10k on 24 Jan",c=>c.doneOn("2027-01-24")],
+    ["Races","rc3","📣","Vienna calling","10k on 7 Mar",c=>c.doneOn("2027-03-07")],
+    ["Races","fin","🏅","Finisher","Half marathon done",c=>c.doneOn("2027-04-18")||c.doneOn("2027-04-17")],
+  ];
+  function achContext(){
+    const done=allKeys.map(k=>({k,e:eff(k)})).filter(x=>isRun(x.e)&&x.e.done);
+    const c={n:done.length, km:done.reduce((a,x)=>a+x.e.km,0), ints:done.filter(x=>x.e.type==="int").length,
+      maxKm:done.reduce((a,x)=>Math.max(a,x.e.km),0), afterBreak:done.some(x=>x.k>="2027-01-15"),
+      doneOn:k=>{const e=eff(k); return !!(isRun(e)&&e.done);}};
+    let cur=0,max=0;
+    for(let mon=mondayOf(START); iso(mon)<=END; mon=add(mon,7)){
+      const es=weekRuns(mon); if(!es.length) continue;
+      if(es.every(e=>e.done)){ cur++; max=Math.max(max,cur); } else if(iso(add(mon,6))<today) cur=0;
+    }
+    c.maxStreak=max;
+    c.perfectMonth=months.some(([y,m])=>{ const p=y+"-"+String(m).padStart(2,"0"); const es=allKeys.filter(k=>k.startsWith(p)).map(eff).filter(isRun); return es.length>=4&&es.every(e=>e.done); });
+    const p1=allKeys.filter(k=>k<="2026-12-27").map(eff).filter(isRun); c.phase1=p1.length>0&&p1.every(e=>e.done);
+    return c;
+  }
+  const toastQ=[]; let toastBusy=false;
+  function toast(m){ toastQ.push(m); if(!toastBusy) nextToast(); }
+  function nextToast(){ const t=document.getElementById("toast"), m=toastQ.shift(); if(!m){toastBusy=false;return;}
+    toastBusy=true; t.textContent=m; t.classList.add("show"); setTimeout(()=>{ t.classList.remove("show"); setTimeout(nextToast,400); },2600); }
+  function renderAch(){
+    const c=achContext(), got=ACH.filter(a=>a[5](c)).map(a=>a[1]);
+    document.getElementById("achCnt").textContent=got.length+"/"+ACH.length;
+    document.getElementById("achRecent").textContent=ACH.filter(a=>got.includes(a[1])).slice(-3).map(a=>a[2]).join("");
+    const body=document.getElementById("achBody"); body.textContent="";
+    let grp=null, grid=null;
+    for(const a of ACH){
+      if(a[0]!==grp){ grp=a[0]; const h=document.createElement("div"); h.className="achgroup"; h.textContent=grp; body.appendChild(h);
+        grid=document.createElement("div"); grid.className="badges"; body.appendChild(grid); }
+      const on=got.includes(a[1]);
+      const b=document.createElement("div"); b.className="badge"+(on?"":" locked");
+      const ic=document.createElement("span"); ic.className="ic"; ic.textContent=a[2]; ic.setAttribute("aria-hidden","true");
+      const tx=document.createElement("div"), bb=document.createElement("b"), sm=document.createElement("small");
+      bb.textContent=a[3]; sm.textContent=a[4]+(on?"":" (locked)");
+      tx.append(bb,sm); b.append(ic,tx); grid.appendChild(b);
+    }
+    if(seen===null){ seen=got.slice(); save(); }
+    else { const fresh=got.filter(id=>!seen.includes(id));
+      if(fresh.length){ fresh.forEach(id=>{ const a=ACH.find(x=>x[1]===id); toast(a[2]+"  Achievement unlocked: "+a[3]); }); seen=seen.concat(fresh); save(); } }
+  }
+
+  // ---------- dialog ----------
+  const dlg=document.getElementById("dlg"), kmIn=document.getElementById("kmIn"), err=document.getElementById("dlgErr");
+  const doneIn=document.getElementById("doneIn"), bSave=document.getElementById("bSave"), bRemove=document.getElementById("bRemove");
+  const typesBox=document.querySelector(".types"), kmBlock=document.getElementById("kmBlock");
+  const DEF={easy:5,long:10,int:7,race:10};
+  let cur=null;
+  const selType=()=>(document.querySelector('input[name=rt]:checked')||{}).value||"easy";
+  document.querySelectorAll('input[name=rt]').forEach(r=>r.addEventListener("change",()=>{ if(!(parseFloat(kmIn.value)>0)) kmIn.value=DEF[selType()]; }));
+  function openDlg(k){
+    cur=k; const e=eff(k); const [y,m,d]=k.split("-").map(Number);
+    document.getElementById("dlgTitle").textContent=new Date(y,m-1,d).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+    const gear=e&&e.type==="gear";
+    typesBox.hidden=gear; kmBlock.hidden=gear;
+    const t=e&&!gear?e.type:"easy";
+    document.querySelectorAll('input[name=rt]').forEach(r=>{ r.checked=r.value===t; });
+    kmIn.value=e&&!gear?e.km:DEF.easy;
+    doneIn.checked=!!(e&&e.done);
+    bSave.textContent=e?"Save":"Add run";
+    bRemove.hidden=!e; bRemove.textContent=gear?"Remove":"Remove run";
+    err.textContent="";
+    if(typeof dlg.showModal==="function") dlg.showModal(); else dlg.setAttribute("open","");
+  }
+  function closeDlg(){ if(dlg.open) dlg.close(); }
+  function setDay(k,entry){
+    const s=P[k];
+    if(entry.type==="none") { if(s) days[k]={type:"none"}; else delete days[k]; }
+    else if(s && entry.type===s.type && entry.km===s.km && !entry.done) delete days[k];
+    else days[k]=entry;
+    save(); closeDlg(); render(k);
+  }
+  bSave.addEventListener("click",()=>{
+    const e=eff(cur);
+    if(e&&e.type==="gear") return setDay(cur,{type:"gear",km:0,done:doneIn.checked});
+    const v=parseFloat(String(kmIn.value).replace(",","."));
+    if(!(v>0)||v>60){ err.textContent="Enter a distance between 0.1 and 60 km."; kmIn.focus(); return; }
+    setDay(cur,{type:selType(),km:Math.round(v*10)/10,done:doneIn.checked});
+  });
+  bRemove.addEventListener("click",()=>setDay(cur,{type:"none"}));
+  document.getElementById("bCancel").addEventListener("click",closeDlg);
+  kmIn.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); bSave.click(); } });
+  dlg.addEventListener("click",e=>{ if(e.target===dlg) closeDlg(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
